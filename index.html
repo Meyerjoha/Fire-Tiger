@@ -1,1 +1,640 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>FireTiger-Resonanzgitter | Terminal v2.6</title>
+    <style>
+        :root {
+            --danger: #ff4d4d;
+            --warning: #ffaa00;
+            --success: #00ffcc;
+            --stable: #ffd700;
+            --bg: #0a0e14;
+        }
 
+        body {
+            background-color: var(--bg);
+            color: #e0e0e0;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            overflow-x: hidden;
+        }
+
+        #terminal-header {
+            border: 2px solid var(--danger);
+            padding: 20px;
+            width: 80%;
+            text-align: center;
+            margin-bottom: 20px;
+            box-shadow: 0 0 15px var(--danger);
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+
+        .status-gold {
+            border-color: var(--stable) !important;
+            box-shadow: 0 0 20px var(--stable) !important;
+            color: var(--stable);
+            animation: none !important;
+        }
+
+        #instability-bar {
+            width: 80%;
+            height: 30px;
+            background: #222;
+            border: 1px solid #444;
+            margin-bottom: 30px;
+            position: relative;
+        }
+
+        #instability-fill {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, var(--warning), var(--danger));
+            transition: width 0.5s ease;
+        }
+
+        .grid-container {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            width: 80%;
+        }
+
+        .channel-card {
+            background: #1a1f26;
+            border: 1px solid #333;
+            padding: 15px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+
+        .channel-card.active {
+            border-color: var(--success);
+            box-shadow: 0 0 10px var(--success);
+        }
+
+        input[type=range] {
+            width: 100%;
+            margin-top: 10px;
+            cursor: pointer;
+        }
+
+        #log {
+            margin-top: 30px;
+            width: 80%;
+            height: 150px;
+            background: #000;
+            padding: 10px;
+            border: 1px solid #333;
+            overflow-y: auto;
+            font-size: 0.9em;
+            color: #888;
+        }
+
+        .damage-flash {
+            position: fixed;
+            top:0; left:0; width: 100vw; height: 100vh;
+            background: rgba(255, 0, 0, 0.3);
+            display: none;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- initial PIN overlay -->
+    <div id="pin-overlay" style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:#000;display:flex;align-items:center;justify-content:center;z-index:2000;flex-direction:column;">
+        <div style="color:#00ccff;font-family:'Courier New', monospace;text-align:center;">
+            <p>PIN eingeben:</p>
+            <input id="initial-pin-input" type="password" style="padding:8px; font-size:1.2em; width:200px; background:#111; color:#0ff; border:1px solid #00ccff;" autofocus onkeydown="if(event.key==='Enter'){checkInitialPin();}">
+            <br><br>
+            <button onclick="checkInitialPin()" style="padding:8px 16px; background:#00ccff; border:1px solid #00ccff; color:#000; cursor:pointer;">OK</button>
+            <div id="pin-countdown" style="margin-top:20px; font-size:2em; color:#ff0; display:none;"></div>
+        </div>
+    </div>
+
+    <div id="terminal-header">
+        <h1 id="main-status">RESONANZINSTABILITÄT – ENERGIEFLUSS ASYNCHRON</h1>
+        <p id="sub-status">KERNPULS: KRITISCH</p>
+    </div>
+
+    <div id="instability-bar">
+        <div id="instability-fill"></div>
+        <div style="position:absolute; top:5px; left:10px; font-weight:bold;">INSTABILITÄT</div>
+    </div>
+
+    <div class="grid-container">
+        <div class="channel-card" id="card-A">
+            <h3>Kanal A</h3>
+            <p>Primärzufuhr</p>
+            <input type="range" min="0" max="100" value="0" id="slider-A" oninput="updateValue('A'); checkSequence('A')">
+            <div style="margin-top:5px; font-size:0.85em; color:#ffaa00;" id="value-A">0%</div>
+        </div>
+        <div class="channel-card" id="card-B">
+            <h3>Kanal B</h3>
+            <p>Stabilisierung</p>
+            <input type="range" min="0" max="100" value="0" id="slider-B" oninput="updateValue('B'); checkSequence('B')">
+            <div style="margin-top:5px; font-size:0.85em; color:#ffaa00;" id="value-B">0%</div>
+        </div>
+        <div class="channel-card" id="card-C">
+            <h3>Kanal C</h3>
+            <p>Verstärkung</p>
+            <input type="range" min="0" max="100" value="0" id="slider-C" oninput="updateValue('C'); checkSequence('C')">
+            <div style="margin-top:5px; font-size:0.85em; color:#ffaa00;" id="value-C">0%</div>
+        </div>
+        <div class="channel-card" id="card-D">
+            <h3>Kanal D</h3>
+            <p>Resonanz</p>
+            <input type="range" min="0" max="100" value="0" id="slider-D" oninput="updateValue('D'); checkSequence('D')">
+            <div style="margin-top:5px; font-size:0.85em; color:#ffaa00;" id="value-D">0%</div>
+        </div>
+        <div class="channel-card" id="card-E">
+            <h3>Kanal E</h3>
+            <p>Dämpfung</p>
+            <input type="range" min="0" max="100" value="0" id="slider-E" oninput="updateValue('E'); checkSequence('E')">
+            <div style="margin-top:5px; font-size:0.85em; color:#ffaa00;" id="value-E">0%</div>
+        </div>
+        <div class="channel-card" id="card-F">
+            <h3>Kanal F</h3>
+            <p>Abschluss</p>
+            <input type="range" min="0" max="100" value="0" id="slider-F" oninput="updateValue('F'); checkSequence('F')">
+            <div style="margin-top:5px; font-size:0.85em; color:#ffaa00;" id="value-F">0%</div>
+        </div>
+    </div>
+
+    <div style="margin-top: 30px; width: 80%; display: flex; gap: 10px; justify-content: center;">
+        <button onclick="openAdminModal()" style="padding: 8px 15px; background: #ff4d4d; border: 1px solid #ff4d4d; color: #fff; cursor: pointer;">Admin Zugang (PIN)</button>
+        <button id="logbook-btn" onclick="openLogbook()" style="padding: 8px 15px; background: #00ccff; border: 1px solid #00ccff; color: #000; cursor: pointer;">Logbuch</button>
+    </div>
+
+    <div id="admin-panel" style="display: none; margin-top: 20px; width: 80%; background: #1a1f26; border: 1px solid #ff4d4d; padding: 20px;">
+        <h3 style="color: #ff4d4d; margin-top: 0;">Admin-Panel: Direkter Wert-Editor</h3>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px;">
+            <div>
+                <label style="display: block; margin-bottom: 5px; color: #ffaa00;">Kanal A:</label>
+                <input type="number" id="admin-A" min="0" max="100" style="width: 100%; padding: 5px; background: #000; border: 1px solid #444; color: #fff;">
+            </div>
+            <div>
+                <label style="display: block; margin-bottom: 5px; color: #ffaa00;">Kanal B:</label>
+                <input type="number" id="admin-B" min="0" max="100" style="width: 100%; padding: 5px; background: #000; border: 1px solid #444; color: #fff;">
+            </div>
+            <div>
+                <label style="display: block; margin-bottom: 5px; color: #ffaa00;">Kanal C:</label>
+                <input type="number" id="admin-C" min="0" max="100" style="width: 100%; padding: 5px; background: #000; border: 1px solid #444; color: #fff;">
+            </div>
+            <div>
+                <label style="display: block; margin-bottom: 5px; color: #ffaa00;">Kanal D:</label>
+                <input type="number" id="admin-D" min="0" max="100" style="width: 100%; padding: 5px; background: #000; border: 1px solid #444; color: #fff;">
+            </div>
+            <div>
+                <label style="display: block; margin-bottom: 5px; color: #ffaa00;">Kanal E:</label>
+                <input type="number" id="admin-E" min="0" max="100" style="width: 100%; padding: 5px; background: #000; border: 1px solid #444; color: #fff;">
+            </div>
+            <div>
+                <label style="display: block; margin-bottom: 5px; color: #ffaa00;">Kanal F:</label>
+                <input type="number" id="admin-F" min="0" max="100" style="width: 100%; padding: 5px; background: #000; border: 1px solid #444; color: #fff;">
+            </div>
+        </div>
+        <button onclick="applyAdminValues()" style="margin-top: 15px; padding: 8px 15px; background: #00ffcc; border: 1px solid #00ffcc; color: #000; cursor: pointer; font-weight: bold;">Werte anwenden</button>
+        <button onclick="toggleDevPanel()" style="margin-top: 8px; padding: 6px 12px; background: #ffaa00; border: 1px solid #ffaa00; color: #000; cursor: pointer;">Entwickler</button>
+        <div id="dev-panel" style="display:none; margin-top:10px;">
+            <button onclick="autoSetValues()" style="margin-top: 8px; padding: 6px 12px; background: #ffaa00; border: 1px solid #ffaa00; color: #000; cursor: pointer;">Auto-Set (PIN)</button>
+            <button onclick="reportError()" style="margin-top: 8px; padding: 6px 12px; background: #ff4d4d; border: 1px solid #ff4d4d; color: #fff; cursor: pointer;">Fehler melden</button>
+            <button onclick="forceAurora()" style="margin-top: 8px; padding: 6px 12px; background: #ffaa00; border: 1px solid #ffaa00; color: #000; cursor: pointer;">Aurora‑Takeover</button>
+        </div>
+    </div>
+
+    <div id="log">
+        [SYSTEM START] Warte auf Benutzereingabe...<br>
+    </div>
+
+    <div class="damage-flash" id="flash"></div>
+    <!-- Fullscreen takeover message -->
+    <div id="aurora-message" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:#000; color:#ff4d4d; font-size:3em; align-items:center; justify-content:center; text-align:center; z-index:1000;">
+        <span id="aurora-text">Danke SS AURORA<br>ab hier übernehmen wir</span>
+    </div>
+
+    <!-- Logbuch display -->
+    <div id="logbook" style="display:none; margin-top:20px; width:80%; background:#111; border:1px solid #00ccff; color:#00ccff; padding:15px; font-size:0.9em; line-height:1.4;">
+        <p>Die Zündsequenz:<br>„Der Prozess startet immer mit Kern A. Kern F bildet den Abschluss, unmittelbar nachdem der Energiewandler E stabilisiert wurde.“</p>
+        <p>Die Last-Verteilung:<br>„Kern A benötigt exakt die Hälfte der Maximallast. Kern F hingegen ist fast am Limit; er verlangt 40% mehr Energie als die Startsequenz von A.“</p>
+        <p>Das B-D-C-Dreieck:<br>„Kern B muss als zweites gezündet werden und benötigt ein Viertel mehr Energie als Kern A. Erst danach darf die Hauptleitung D aktiviert werden, die mit 80% die zweithöchste Last im System trägt.“</p>
+        <p>Die Kühlungs-Logik:<br>„Der Kühlkreislauf C darf erst nach der Hauptleitung D online gehen. Seine Last (C) muss genau 20% niedriger sein als die der Leitung D.“</p>
+        <p>Die E-Balance:<br>„Sobald Kern C stabil ist, folgt Kern E. Seine Energie muss exakt der mathematische Durchschnitt aus der Last von C und D sein.“</p>
+        <div id="admin-countdown" style="display:none; margin-top:10px; font-size:1.5em; color:#ff0;"></div>
+    </div>
+
+
+    <!-- Admin PIN Modal -->
+    <div id="admin-pin-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); align-items:center; justify-content:center; z-index:10000;">
+        <div style="background:#0a0e14; padding:20px; border:1px solid #444; width:320px; text-align:center;">
+            <h3 style="margin:0 0 10px 0; color:#ff4d4d;">Admin PIN</h3>
+            <input id="admin-pin-input" type="password" placeholder="PIN eingeben" style="width:100%; padding:8px; margin-bottom:10px; background:#000; border:1px solid #444; color:#fff;">
+            <div style="display:flex; gap:8px; justify-content:center;">
+                <button onclick="submitAdminPin()" style="padding:8px 12px; background:#00ffcc; border:1px solid #00ffcc; color:#000;">OK</button>
+                <button onclick="closeAdminModal()" style="padding:8px 12px; background:#ff4d4d; border:1px solid #ff4d4d; color:#fff;">Abbrechen</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // admin PIN must be initialized early
+        const adminPin = '1234';
+
+        // broadcastState removed (realtime sync disabled)
+        function broadcastState(path, value) {
+            // no-op
+        }
+
+
+
+
+        const correctOrder = ['A', 'B', 'D', 'C', 'E', 'F'];
+        const requiredPercentage = {
+            'A': 50,
+            'B': 75,
+            'C': 60,
+            'D': 80,
+            'E': 70,
+            'F': 90
+        };
+        let currentStep = 0;
+        let instability = 0;
+        const maxInstability = 8;
+        
+        // blink & aurora animation keyframes
+        const styleElement = document.createElement('style');
+        styleElement.innerHTML = `
+            @keyframes blink { 0%{opacity:1;} 50%{opacity:0;} 100%{opacity:1;} }
+            @keyframes aurora-blink {
+                0% {opacity:0.5; transform:scale(1);}
+                50% {opacity:1; transform:scale(1.2);}
+                100% {opacity:0.5; transform:scale(1);}
+            }
+        `;
+        document.head.appendChild(styleElement);
+
+
+        function addLog(message, color = "#888", remote = false) {
+            const log = document.getElementById('log');
+            log.innerHTML += `<span style="color:${color}">> ${message}</span><br>`;
+            log.scrollTop = log.scrollHeight;
+
+        }
+
+        function updateValue(id) {
+            const slider = document.getElementById(`slider-${id}`);
+            const valueDisplay = document.getElementById(`value-${id}`);
+            valueDisplay.innerText = slider.value + '%';
+
+        }
+
+        function triggerFlash() {
+            const flash = document.getElementById('flash');
+            flash.style.display = 'block';
+            setTimeout(() => flash.style.display = 'none', 500);
+        }
+
+        function checkSequence(id) {
+            const slider = document.getElementById(`slider-${id}`);
+            const card = document.getElementById(`card-${id}`);
+            const sliderValue = parseInt(slider.value);
+            const requiredValue = requiredPercentage[id];
+
+            if (id === correctOrder[currentStep]) {
+                if (sliderValue >= requiredValue) {
+                    // RICHTIG - Prozent erreicht
+                    card.classList.add('active');
+                    addLog(`Kanal ${id} erfolgreich synchronisiert (${sliderValue}% / ${requiredValue}% erforderlich).`, "#00ffcc");
+                    currentStep++;
+                    
+                    if (currentStep === correctOrder.length) {
+                        solvePuzzle();
+                    }
+                } else {
+                    // Kanal korrekt aber Prozent nicht erreicht
+                    card.classList.remove('active');
+                    addLog(`Kanal ${id}: Zu wenig Energie (${sliderValue}% / ${requiredValue}% erforderlich).`, "#ffaa00");
+                }
+            } else if (sliderValue >= requiredValue) {
+                // FALSCH - Falscher Kanal und Prozent erreicht
+                instability += 2;
+                updateInstability();
+                addLog(`FEHLER: Kanal ${id} aktiviert! Warte auf Kanal ${correctOrder[currentStep]}.`, "#ff4d4d");
+                triggerFlash();
+                resetSliders();
+            }
+        }
+
+        function updateInstability() {
+            const fill = document.getElementById('instability-fill');
+            const percent = (instability / maxInstability) * 100;
+            fill.style.width = percent + "%";
+
+            if (instability >= 5 && instability < 8) {
+                addLog("WARNUNG: Kernentladung steht bevor!", "#ffaa00");
+            }
+            
+            if (instability >= 8) {
+                addLog("KRITISCHER FEHLER: System-Notabschaltung eingeleitet!", "#ff0000");
+                document.getElementById('main-status').innerText = "NOTABSCHALTUNG AKTIV";
+            }
+        }
+
+        function resetSliders() {
+            currentStep = 0;
+            const sliders = ['A', 'B', 'C', 'D', 'E', 'F'];
+            sliders.forEach(s => {
+                const maxValue = requiredPercentage[s] - 1;
+                const randomValue = Math.floor(Math.random() * (maxValue + 1));
+                document.getElementById(`slider-${s}`).value = randomValue;
+                document.getElementById(`value-${s}`).innerText = randomValue + '%';
+                document.getElementById(`card-${s}`).classList.remove('active');
+            });
+            addLog("System resettet... Kanäle mit zufälligen Werten initialisiert.", "#ffaa00");
+        }
+
+        function initSliders() {
+            const sliders = ['A', 'B', 'C', 'D', 'E', 'F'];
+            sliders.forEach(s => {
+                const maxValue = requiredPercentage[s] - 1;
+                const randomValue = Math.floor(Math.random() * (maxValue + 1));
+                document.getElementById(`slider-${s}`).value = randomValue;
+                document.getElementById(`value-${s}`).innerText = randomValue + '%';
+            });
+        }
+
+
+
+        function solvePuzzle() {
+            document.getElementById('terminal-header').classList.add('status-gold');
+            document.getElementById('main-status').innerText = "RESONANZ STABIL – SIGNAL ENTSPERRT";
+            document.getElementById('sub-status').innerText = "KERNPULS: HARMONISCH";
+            addLog("RESONANZ ERREICHT. Datenpakete werden dekomprimiert...", "#ffd700");
+            
+            // Automatisches Zählen von 10 bis 100 Prozent
+            let percentage = 10;
+            const progressInterval = setInterval(() => {
+                addLog(`Dekomprimierung: ${percentage}%`, "#ffd700");
+                percentage += 2;
+                
+                if (percentage > 100) {
+                    clearInterval(progressInterval);
+                    addLog("Dekomprimierung abgeschlossen!", "#00ffcc");
+                    // start data transfer
+                    addLog("Starte Datenübertragung an SS AURORA...", "#00ffcc");
+                    setTimeout(() => {
+                        addLog("TRANSMISSION ABORTED: Verbindung gestört!", "#ff4d4d");
+                        showAuroraMessage();
+                    }, 1500);
+                }
+            }, 300);
+        }
+
+        function promptAdminPin() {
+            try {
+                const pin = prompt('PIN für Admin-Zugang eingeben:');
+                addLog('Admin PIN Versuch', '#ffaa00');
+                if (pin === adminPin) {
+                    const panel = document.getElementById('admin-panel');
+                    if (!panel) {
+                        addLog('Fehler: Admin-Panel Element nicht gefunden', '#ff4d4d');
+                        return;
+                    }
+                    // show panel
+                    panel.style.display = 'block';
+                    panel.style.position = 'relative';
+                    panel.style.zIndex = 99999;
+                    panel.style.outline = '3px solid #00ffcc';
+                    addLog('Admin-Panel entsperrt.', '#ff4d4d');
+
+                    // Populate admin fields
+                    ['A', 'B', 'C', 'D', 'E', 'F'].forEach(id => {
+                        const adminField = document.getElementById(`admin-${id}`);
+                        const sliderField = document.getElementById(`slider-${id}`);
+                        if (adminField && sliderField) adminField.value = sliderField.value;
+                    });
+                } else if (pin !== null) {
+                    addLog('ZUGANG VERWEIGERT: PIN falsch!', '#ff4d4d');
+                    triggerFlash();
+                }
+            } catch (e) {
+                addLog('Fehler beim Öffnen des Admin-Panels: ' + (e && e.message ? e.message : e), '#ff4d4d');
+            }
+        }
+
+        function applyAdminValues() {
+            currentStep = 0;
+            correctOrder.forEach(id => {
+                const value = Math.max(0, Math.min(100, parseInt(document.getElementById(`admin-${id}`).value) || 0));
+                document.getElementById(`slider-${id}`).value = value;
+                document.getElementById(`value-${id}`).innerText = value + '%';
+                checkSequence(id);
+            });
+            addLog("Admin-Werte in korrekt Reihenfolge angewendet.", "#ffaa00");
+        }
+
+        function showAuroraMessage() {
+            const msg = document.getElementById('aurora-message');
+            const text = document.getElementById('aurora-text');
+            msg.style.display = 'flex';
+            // hide admin panel if open
+            const admin = document.getElementById('admin-panel');
+            if (admin) admin.style.display = 'none';
+            // animate the message text with the aurora-blink keyframe (slower, smoother)
+            if (text) {
+                text.style.animation = 'aurora-blink 2s ease-in-out infinite';
+            }
+        }
+
+        // PIN für Auto-Set-Funktion
+        const autoSetPin = '4321';
+
+        function autoSetValues() {
+            // fülle admin-Felder mit requiredPercentage in richtiger Reihenfolge
+            correctOrder.forEach(id => {
+                document.getElementById(`admin-${id}`).value = requiredPercentage[id];
+            });
+            addLog('Auto-Set aktiviert: Werte eingefügt.', '#00ffcc');
+            // Werte sofort anwenden
+            applyAdminValues();
+        }
+
+        function reportError() {
+            const msg = prompt('Fehlermeldung eingeben:');
+            if (msg !== null && msg.trim() !== '') {
+                addLog(`!!! ADMIN ERROR: ${msg}`, '#ff4d4d');
+                triggerFlash();
+            }
+        }
+
+        function forceAurora() {
+            addLog('Aurora-Übernahme manuell ausgelöst.', '#ff4d4d');
+            showAuroraMessage();
+        }
+
+        function toggleDevPanel() {
+            const pw = prompt('Entwickler-PIN eingeben:');
+            if (pw === 'hanno2005') {
+                const dev = document.getElementById('dev-panel');
+                dev.style.display = dev.style.display === 'none' ? 'block' : 'none';
+                addLog(`Dev-Panel ${dev.style.display === 'block' ? 'geöffnet' : 'geschlossen'}.`, '#ffaa00');
+            } else if (pw !== null) {
+                addLog('Falscher Entwickler-PIN!', '#ff4d4d');
+            }
+        }
+
+        function openLogbook() {
+            const pw = prompt('Passwort für Logbuch eingeben:');
+            if (pw === '7253') {
+                const lb = document.getElementById('logbook');
+                if (lb) lb.style.display = 'block';
+            } else if (pw !== null) {
+                addLog('Logbuch-Zugang verweigert', '#ff4d4d');
+            }
+        }
+
+        // helper to show logbook with countdown then call callback
+        function showLogbookWithCountdown(seconds, onComplete) {
+            const lb = document.getElementById('logbook');
+            const cd = document.getElementById('admin-countdown');
+            if (lb) {
+                lb.style.display = 'block';
+                lb.style.position = 'fixed';
+                lb.style.top = '10%';
+                lb.style.left = '10%';
+                lb.style.zIndex = '2001';
+            }
+            if (cd) {
+                cd.style.display = 'block';
+                let remaining = seconds;
+                cd.innerText = remaining + 's';
+                const interval = setInterval(() => {
+                    remaining -= 1;
+                    cd.innerText = remaining + 's';
+                    if (remaining <= 0) {
+                        clearInterval(interval);
+                        cd.style.display = 'none';
+                        if (lb) lb.style.display = 'none';
+                        if (typeof onComplete === 'function') onComplete();
+                    }
+                }, 1000);
+            }
+        }
+
+        function checkInitialPin() {
+            const v = document.getElementById('initial-pin-input').value;
+            if (v === '7253') {
+                // logbuch PIN: normal 60‑second display
+                const btn = document.getElementById('logbook-btn');
+                if (btn) btn.style.display = 'none';
+                const lb = document.getElementById('logbook');
+                if (lb) {
+                    lb.style.display = 'block';
+                    lb.style.position = 'fixed';
+                    lb.style.top = '10%';
+                    lb.style.left = '10%';
+                    lb.style.zIndex = '2001';
+                }
+                document.getElementById('initial-pin-input').style.display = 'none';
+                document.querySelector('#pin-overlay button').style.display = 'none';
+                let remaining = 60;
+                const cd = document.getElementById('pin-countdown');
+                if (cd) {
+                    cd.style.display = 'block';
+                    cd.innerText = remaining + 's';
+                }
+                const interval = setInterval(() => {
+                    remaining -= 1;
+                    if (cd) cd.innerText = remaining + 's';
+                    if (remaining <= 0) {
+                        clearInterval(interval);
+                        const overlay = document.getElementById('pin-overlay');
+                        if (overlay) overlay.style.display = 'none';
+                        if (lb) lb.style.display = 'none';
+                    }
+                }, 1000);
+            } else if (v === adminPin) {
+                // admin PIN: hide overlay immediately and show logbook briefly, then open admin panel
+                const overlay = document.getElementById('pin-overlay');
+                if (overlay) overlay.style.display = 'none';
+                showLogbookWithCountdown(5, () => {
+                    const panel = document.getElementById('admin-panel');
+                    if (panel) {
+                        panel.style.display = 'block';
+                        panel.style.position = 'relative';
+                        panel.style.zIndex = 99999;
+                        panel.style.outline = '3px solid #00ffcc';
+                        addLog('Admin-Panel entsperrt.', '#ff4d4d');
+                    }
+                });
+            } else {
+                alert('Falscher PIN');
+            }
+        }
+
+
+        function openAdminModal() {
+            const modal = document.getElementById('admin-pin-modal');
+            if (!modal) { addLog('Admin modal not found', '#ff4d4d'); return; }
+            modal.style.display = 'flex';
+            const input = document.getElementById('admin-pin-input');
+            if (input) { input.value = ''; input.focus(); }
+        }
+
+        function closeAdminModal() {
+            const modal = document.getElementById('admin-pin-modal');
+            if (modal) modal.style.display = 'none';
+        }
+
+        function submitAdminPin() {
+            const input = document.getElementById('admin-pin-input');
+            if (!input) {
+                addLog('Fehler: PIN‑Eingabefeld nicht gefunden.', '#ff4d4d');
+                return;
+            }
+            const v = (typeof input.value === 'string') ? input.value.trim() : '';
+            // hide modal immediately
+            closeAdminModal();
+            try {
+                if (typeof adminPin === 'undefined') {
+                    addLog('Fehler: Admin PIN nicht konfiguriert.', '#ff4d4d');
+                    return;
+                }
+                if (v === adminPin) {
+                    // show logbook for 5 seconds then open admin panel
+                    showLogbookWithCountdown(5, () => {
+                        const panel = document.getElementById('admin-panel');
+                        if (panel) {
+                            panel.style.display = 'block';
+                            panel.style.position = 'relative';
+                            panel.style.zIndex = 99999;
+                            panel.style.outline = '3px solid #00ffcc';
+                            addLog('Admin-Panel entsperrt.', '#ff4d4d');
+                        } else {
+                            addLog('Fehler: Admin-Panel Element nicht gefunden', '#ff4d4d');
+                        }
+                    });
+                } else {
+                    addLog('ZUGANG VERWEIGERT: PIN falsch!', '#ff4d4d');
+                    triggerFlash();
+                }
+            } catch(e) {
+                addLog('Fehler beim Prüfen des PINs: ' + (e && e.message ? e.message : e), '#ff4d4d');
+            }
+        }
+
+        
+        // Initialisiere Slider beim Laden
+        initSliders();
+    </script>
+</body>
+</html>
