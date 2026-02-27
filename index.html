@@ -106,18 +106,30 @@
             display: none;
             pointer-events: none;
         }
+
+        .zahl {
+            position: relative;
+            color: #fff;
+            font-weight: bold;
+            font-size: 3rem;
+            pointer-events: none; /* Man kann nicht darauf klicken */
+            opacity: 0;
+            transition: opacity 0.1s ease-in-out;
+        }
     </style>
 </head>
 <body>
 
     <!-- initial PIN overlay -->
-    <div id="pin-overlay" style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:#000;display:flex;align-items:center;justify-content:center;z-index:2000;flex-direction:column;">
+     
+    <div id="pin-overlay" style="position:fixed;top:0;left:0;width:100vw;height:100vh;background:#000000;display:flex;align-items:center;justify-content:center;z-index:2000;flex-direction:column;">
         <div style="color:#00ccff;font-family:'Courier New', monospace;text-align:center;">
             <p>PIN eingeben:</p>
             <input id="initial-pin-input" type="password" style="padding:8px; font-size:1.2em; width:200px; background:#111; color:#0ff; border:1px solid #00ccff;" autofocus onkeydown="if(event.key==='Enter'){checkInitialPin();}">
             <br><br>
             <button onclick="checkInitialPin()" style="padding:8px 16px; background:#00ccff; border:1px solid #00ccff; color:#000; cursor:pointer;">OK</button>
             <div id="pin-countdown" style="margin-top:20px; font-size:2em; color:#ff0; display:none;"></div>
+            
         </div>
     </div>
 
@@ -206,7 +218,7 @@
         <button onclick="applyAdminValues()" style="margin-top: 15px; padding: 8px 15px; background: #00ffcc; border: 1px solid #00ffcc; color: #000; cursor: pointer; font-weight: bold;">Werte anwenden</button>
         <button onclick="toggleDevPanel()" style="margin-top: 8px; padding: 6px 12px; background: #ffaa00; border: 1px solid #ffaa00; color: #000; cursor: pointer;">Entwickler</button>
         <div id="dev-panel" style="display:none; margin-top:10px;">
-            <button onclick="autoSetValues()" style="margin-top: 8px; padding: 6px 12px; background: #ffaa00; border: 1px solid #ffaa00; color: #000; cursor: pointer;">Auto-Set (PIN)</button>
+            <button onclick="autoSetValues()" style="margin-top: 8px; padding: 6px 12px; background: #ffaa00; border: 1px solid #ffaa00; color: #000; cursor: pointer;">Auto-Set </button>
             <button onclick="reportError()" style="margin-top: 8px; padding: 6px 12px; background: #ff4d4d; border: 1px solid #ff4d4d; color: #fff; cursor: pointer;">Fehler melden</button>
             <button onclick="forceAurora()" style="margin-top: 8px; padding: 6px 12px; background: #ffaa00; border: 1px solid #ffaa00; color: #000; cursor: pointer;">Aurora‑Takeover</button>
         </div>
@@ -247,7 +259,7 @@
 
     <script>
         // admin PIN must be initialized early
-        const adminPin = '1234';
+        const adminPin = '2208';
 
         // broadcastState removed (realtime sync disabled)
         function broadcastState(path, value) {
@@ -322,7 +334,7 @@
                 } else {
                     // Kanal korrekt aber Prozent nicht erreicht
                     card.classList.remove('active');
-                    addLog(`Kanal ${id}: Zu wenig Energie (${sliderValue}% / ${requiredValue}% erforderlich).`, "#ffaa00");
+                    addLog(`Kanal ${id}: Zu wenig Energie (${sliderValue}% / X% erforderlich).`, "#ffaa00");
                 }
             } else if (sliderValue >= requiredValue) {
                 // FALSCH - Falscher Kanal und Prozent erreicht
